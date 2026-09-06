@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { scanAlbumSavedState } from '../src/savedState/albumSavedStateScanner.js';
+import { MIN_ADVANCE_GAP_MS, scanAlbumSavedState } from '../src/savedState/albumSavedStateScanner.js';
 
 /**
  * A fake Google Photos viewer with a virtual clock, so the tests finish at once
@@ -12,6 +12,7 @@ import { scanAlbumSavedState } from '../src/savedState/albumSavedStateScanner.js
  * @param {number} [options.blankReadings]             Readings that return null on arrival, per photo.
  * @param {number} [options.lateSaveButtonReadings]    Readings that look "saved" before the Save button draws.
  * @param {number} [options.workingAdvanceAttempt]     Which "next photo" method actually works.
+ * @param {number} [options.advanceDelayMs]            How long the page takes to show the next photo.
  * @param {boolean} [options.wrapsAround]              Whether the last photo leads back to the first.
  * @param {'closes' | 'stays'} [options.endBehavior]   What the viewer does past the last photo. Google Photos stays.
  * @param {'enabled' | 'disabled' | 'missing'} [options.nextControlState] The state of the next-photo control.
@@ -22,6 +23,7 @@ function fakeViewer({
   blankReadings = 0,
   lateSaveButtonReadings = 0,
   workingAdvanceAttempt = 0,
+  advanceDelayMs = 0,
   wrapsAround = false,
   endBehavior = 'closes',
   nextControlState = 'enabled',
@@ -30,6 +32,9 @@ function fakeViewer({
   const photoKeys = states.map((_state, index) => `photo-${index}`);
   let index = 0;
   let clock = 0;
+  /** When the page will finally reveal the photo it was asked for. */
+  let advanceReadyAt = 0;
+  let pendingIndex = -1;
   let readingsSinceArrival = 0;
   let probeCalls = 0;
 
@@ -41,17 +46,30 @@ function fakeViewer({
     get probeCalls() {
       return probeCalls;
     },
+    get elapsed() {
+      return clock;
+    },
     deps: {
-      readCurrentPhotoKey: () => photoKeys[index] ?? null,
+      readCurrentPhotoKey: () => {
+        // The page needs advanceDelayMs to catch up before it shows the photo.
+        if (pendingIndex >= 0 && clock >= advanceReadyAt) {
+          index = pendingIndex;
+          pendingIndex = -1;
+        }
+        return photoKeys[index] ?? null;
+      },
       readNextControlState: () => nextControlState,
       /** @param {number} attempt */
       async requestNextPhoto(attempt) {
         if (attempt !== workingAdvanceAttempt) return;
-        if (index < photoKeys.length - 1) index += 1;
-        else if (wrapsAround) index = 0;
+        let target;
+        if (index < photoKeys.length - 1) target = index + 1;
+        else if (wrapsAround) target = 0;
         // Past the last photo, a real Google Photos viewer stays open on it.
         else if (endBehavior === 'stays') return;
-        else index = photoKeys.length; // readCurrentPhotoKey then returns null
+        else target = photoKeys.length; // readCurrentPhotoKey then returns null
+        pendingIndex = target;
+        advanceReadyAt = clock + advanceDelayMs;
         readingsSinceArrival = 0;
       },
       probe: () => {
@@ -167,7 +185,8 @@ test('rescanKnown reads the toolbar again even for cached photos', async () => {
 });
 
 test('falls back to the named next-photo button when the arrow key does nothing', async () => {
-  const viewer = fakeViewer({ states: ['saved', 'unsaved'], workingAdvanceAttempt: 2 });
+  // Odd attempts click the control; even attempts send the key.
+  const viewer = fakeViewer({ states: ['saved', 'unsaved'], workingAdvanceAttempt: 1 });
 
   const outcome = await scanAlbumSavedState(viewer.deps);
 
@@ -201,6 +220,28 @@ test('an enabled next control that does nothing is a stall, not the end', async 
   const outcome = await scanAlbumSavedState(viewer.deps);
 
   assert.equal(outcome.reason, 'stuck');
+});
+
+test('keeps going when the page takes seconds to show the next photo', async () => {
+  // The real failure: a scan that raced through cached photos outran the album
+  // loading, then gave up after a budget far shorter than the page needed.
+  const viewer = fakeViewer({ states: ['saved', 'unsaved', 'unsaved'], advanceDelayMs: 4000 });
+
+  const outcome = await scanAlbumSavedState(viewer.deps);
+
+  assert.equal(outcome.reason, 'end-of-album');
+  assert.equal(outcome.scanned, 3);
+});
+
+test('paces itself through cached photos so it cannot outrun the page', async () => {
+  /** @type {Record<string, 'saved' | 'unsaved'>} */
+  const cache = { 'photo-0': 'saved', 'photo-1': 'saved', 'photo-2': 'saved' };
+  const viewer = fakeViewer({ states: ['saved', 'saved', 'saved'], cache });
+
+  await scanAlbumSavedState(viewer.deps);
+
+  assert.equal(viewer.probeCalls, 0, 'cached photos must still skip the toolbar read');
+  assert.ok(viewer.elapsed >= 2 * MIN_ADVANCE_GAP_MS, `a cached run must still pace each advance, spent ${viewer.elapsed}ms`);
 });
 
 test('a next control we cannot find is never treated as the end', async () => {

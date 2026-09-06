@@ -80,7 +80,9 @@ The scan moves forward with the right arrow key, and then with a button whose na
 That message covers two different situations, and the count tells you which one you have.
 
 - **The scan finished the album.** Google Photos keeps the viewer open on the last photo, so "cannot go further" is exactly what the end of an album looks like. If the count matches the album, you are done and the badges are complete.
-- **The scan stalled early.** If the count is well short of the album, a photo took longer to load than the scan waits. Raise **Give up on one photo after** on the options page and scan again. The scan skips every photo it already read, so the second run is fast.
+- **The scan stalled early.** If the count is well short of the album, the album had not loaded that far yet. Just scan again. The scan skips every photo it already read, so it returns to the same place quickly and carries on from there. Repeat until the count stops growing.
+
+  The scan waits about 11 seconds for a photo to appear before it gives up, and it alternates the arrow key with the next button while it waits. **Give up on one photo after** does not affect this; that setting controls the toolbar reading, not the moving.
 
 When Google Photos marks its next button as disabled on the last photo, the scan detects that and reports a finished run instead.
 

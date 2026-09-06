@@ -17,7 +17,7 @@ Read the viewer toolbar. `savedStateProbe.js` collects the accessible names of t
 Two consequences of this source shape the design and must not be simplified away.
 
 - **`null` is a real answer.** An empty toolbar and a saved photo look identical, so a guess would mark unsaved photos as done and the user would lose photos.
-- **The two answers are not symmetrical.** A visible Save button is positive evidence, so `unsaved` is accepted on the first clear reading. `saved` is the absence of that button, which is also what a half-drawn toolbar looks like, so it must hold for `confirmSavedMs` first. This is both the fast path and the safe path.
+- **The two answers are not symmetrical.** A visible Save button is positive evidence, so `unsaved` is accepted on the first clear reading, with no settling delay. `saved` is the absence of that button, which is also what a half-drawn toolbar looks like, so it waits out `minDwellMs` and then must hold for `confirmSavedMs`. This is both the fast path and the safe path, because a stale toolbar can only mislead in the harmless direction: a saved photo badged unsaved costs one re-save that Google Photos deduplicates.
 
 **Rejected alternative:** parse the `batchexecute` responses. It would remove the per-photo walk and make a scan almost instant, but it breaks silently whenever Google reorders an array, it needs the page's credentials, and a wrong index yields a plausible wrong answer instead of an error. The toolbar breaks loudly and is fixed by editing a label list.
 
@@ -32,6 +32,6 @@ Two consequences of this source shape the design and must not be simplified away
 
 **Trade-offs and follow-up:**
 
-- A scan must open every photo, so it costs roughly a fifth of a second per unsaved photo and about half a second per saved one, plus the bandwidth of loading each photo.
+- A scan must open every photo, so it costs roughly a tenth of a second per unsaved photo and about half a second per saved one, plus the bandwidth of loading each photo. Almost every photo in an album worth managing is unsaved, so the fast path sets the pace.
 - The label list is language-dependent. The panel's **Copy diagnostics** button reports the names actually found, so a user in any language can repair the list.
 - If Google ever stops showing a Save button for an unsaved shared photo, this approach has no fallback and the feature ends.

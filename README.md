@@ -90,7 +90,7 @@ When Google Photos marks its next button as disabled on the last photo, the scan
 
 ### The scan is slow
 
-Each photo costs about one fifth of a second when it is not saved, and about half a second when it is. A photo the scan already knows costs almost nothing, so a second scan of the same album is fast. To speed up a first scan, lower **Confirm "saved" for**. Do not lower it below the time your connection needs to draw the toolbar, or the scan starts reporting photos it could not read.
+Each photo costs about one tenth of a second when it is not saved, and about half a second when it is. A shared album you want to manage is mostly unsaved photos, so most of it runs at the faster rate. A photo the scan already knows costs almost nothing, so a second scan of the same album is fast. To speed up a first scan, lower **Confirm "saved" for**. Do not lower it below the time your connection needs to draw the toolbar, or the scan starts reporting photos it could not read.
 
 ### The scan says some photos "could not be read"
 

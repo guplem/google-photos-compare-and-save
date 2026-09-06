@@ -61,16 +61,21 @@ function readControlName(element) {
  * the photo. Without this nudge a click fallback has nothing to click, because
  * synthetic clicks never move the real pointer.
  * @param {Window} view
+ * @param {number} step Increases on every call, so the pointer never lands twice on one spot.
  */
-function nudgePointerOverViewer(view) {
+function nudgePointerOverViewer(view, step) {
+  // The coordinates must change between calls. A page that tracks the pointer
+  // ignores a mousemove that lands on the same spot, so a fixed point would stop
+  // waking the chrome after the first call.
   const event = new MouseEvent('mousemove', {
     bubbles: true,
     cancelable: true,
     composed: true,
-    clientX: Math.round(view.innerWidth * 0.9),
-    clientY: Math.round(view.innerHeight * 0.5),
+    clientX: Math.round(view.innerWidth * 0.5) + (step % 2 === 0 ? 8 : -8),
+    clientY: Math.round(view.innerHeight * 0.5) + (step % 4 < 2 ? 8 : -8),
   });
   view.document.dispatchEvent(event);
+  view.document.body?.dispatchEvent(event);
 }
 
 /**
@@ -107,6 +112,8 @@ function findScrollingAncestor(view, start) {
  * @param {Window} view
  */
 export function createPhotoViewerNavigator(view) {
+  let wakeStep = 0;
+
   /**
    * @param {number} milliseconds
    * @returns {Promise<void>}
@@ -138,6 +145,18 @@ export function createPhotoViewerNavigator(view) {
   }
 
   return {
+    /**
+     * Makes Google Photos show its viewer chrome again.
+     *
+     * The site hides the toolbar and the next-photo control while the pointer
+     * stays still. A scan never moves the real pointer, so without this call the
+     * probe reads an empty toolbar and reports a readable photo as unreadable.
+     */
+    keepChromeAwake() {
+      wakeStep += 1;
+      nudgePointerOverViewer(view, wakeStep);
+    },
+
     /**
      * Reports whether the viewer still offers a next photo.
      *
@@ -228,7 +247,7 @@ export function createPhotoViewerNavigator(view) {
         return;
       }
 
-      nudgePointerOverViewer(view);
+      this.keepChromeAwake();
       await wait(120);
       findNextControl(true)?.click();
     },

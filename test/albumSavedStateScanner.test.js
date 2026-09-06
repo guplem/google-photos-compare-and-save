@@ -13,6 +13,7 @@ import { MIN_ADVANCE_GAP_MS, scanAlbumSavedState } from '../src/savedState/album
  * @param {number} [options.lateSaveButtonReadings]    Readings that look "saved" before the Save button draws.
  * @param {number} [options.workingAdvanceAttempt]     Which "next photo" method actually works.
  * @param {number} [options.advanceDelayMs]            How long the page takes to show the next photo.
+ * @param {boolean} [options.chromeHidesWhenIdle]      Whether the toolbar disappears unless the page is woken.
  * @param {boolean} [options.wrapsAround]              Whether the last photo leads back to the first.
  * @param {'closes' | 'stays'} [options.endBehavior]   What the viewer does past the last photo. Google Photos stays.
  * @param {'enabled' | 'disabled' | 'missing'} [options.nextControlState] The state of the next-photo control.
@@ -24,6 +25,7 @@ function fakeViewer({
   lateSaveButtonReadings = 0,
   workingAdvanceAttempt = 0,
   advanceDelayMs = 0,
+  chromeHidesWhenIdle = false,
   wrapsAround = false,
   endBehavior = 'closes',
   nextControlState = 'enabled',
@@ -35,6 +37,8 @@ function fakeViewer({
   /** When the page will finally reveal the photo it was asked for. */
   let advanceReadyAt = 0;
   let pendingIndex = -1;
+  /** Google Photos shows the toolbar for a moment after the pointer moves. */
+  let awakeUntil = 0;
   let readingsSinceArrival = 0;
   let probeCalls = 0;
 
@@ -72,9 +76,14 @@ function fakeViewer({
         advanceReadyAt = clock + advanceDelayMs;
         readingsSinceArrival = 0;
       },
+      keepPageAwake: () => {
+        awakeUntil = clock + 1000;
+      },
       probe: () => {
         probeCalls += 1;
         readingsSinceArrival += 1;
+        // A hidden toolbar has no buttons at all, which the probe reports as null.
+        if (chromeHidesWhenIdle && clock > awakeUntil) return null;
         if (readingsSinceArrival <= blankReadings) return null;
         // The toolbar is drawn but the Save button has not appeared yet, so the
         // photo looks saved even though it is not.
@@ -242,6 +251,28 @@ test('paces itself through cached photos so it cannot outrun the page', async ()
 
   assert.equal(viewer.probeCalls, 0, 'cached photos must still skip the toolbar read');
   assert.ok(viewer.elapsed >= 2 * MIN_ADVANCE_GAP_MS, `a cached run must still pace each advance, spent ${viewer.elapsed}ms`);
+});
+
+test('wakes the page when the toolbar reads as empty, instead of losing the photo', async () => {
+  // Google Photos hides the viewer chrome while the pointer stays still. A scan
+  // never moves the pointer, so without a wake it reads an empty toolbar and
+  // marks a readable photo unreadable.
+  const viewer = fakeViewer({ states: ['unsaved', 'saved'], chromeHidesWhenIdle: true });
+
+  const outcome = await scanAlbumSavedState(viewer.deps);
+
+  assert.equal(outcome.unknown, 0, 'no photo should be lost to a hidden toolbar');
+  assert.equal(outcome.unsaved, 1);
+  assert.equal(outcome.saved, 1);
+});
+
+test('reports the state of the next control when it gives up, so a stall can be diagnosed', async () => {
+  const viewer = fakeViewer({ states: ['unsaved'], endBehavior: 'stays', nextControlState: 'missing' });
+
+  const outcome = await scanAlbumSavedState(viewer.deps);
+
+  assert.equal(outcome.reason, 'stuck');
+  assert.equal(outcome.nextControlState, 'missing');
 });
 
 test('a next control we cannot find is never treated as the end', async () => {

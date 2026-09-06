@@ -21,6 +21,7 @@ import { createPhotoViewerNavigator } from './savedState/photoViewerNavigator.js
 import { scanAlbumSavedState } from './savedState/albumSavedStateScanner.js';
 import { createSavedBadgeRenderer } from './savedState/savedBadgeRenderer.js';
 import { createControlPanel } from './controlPanel/controlPanelController.js';
+import { buildDiagnosticsReport } from './diagnosticsReport.js';
 
 /** How often we check whether the single-page app changed the address bar. */
 const LOCATION_POLL_MS = 300;
@@ -30,6 +31,18 @@ const WRITE_BATCH_SIZE = 10;
 
 /** How long the virtualised album grid needs to redraw after a scroll, in milliseconds. */
 const GRID_REDRAW_WAIT_MS = 500;
+
+/**
+ * How the diagnostics button samples the toolbar.
+ *
+ * It must run long enough to catch Google Photos hiding the viewer chrome, which
+ * happens a few seconds after the pointer stops. It also must not wake the page,
+ * or it would only ever see the state a user sees and never the state a scan
+ * sees. The user has just moved the pointer to press the button, so the first
+ * sample is the awake state and the last ones show what a scan would find.
+ */
+const DIAGNOSTICS_SAMPLE_COUNT = 5;
+const DIAGNOSTICS_SAMPLE_GAP_MS = 1000;
 
 /**
  * @param {number} milliseconds
@@ -63,6 +76,8 @@ export async function start() {
   let scanning = false;
   let stopRequested = false;
   let lastHref = '';
+  /** @type {import('./savedState/albumSavedStateScanner.js').ScanOutcome | null} */
+  let lastScanOutcome = null;
 
   /** @type {Map<string, import('./savedState/savedStateStore.js').SavedState>} */
   const unwrittenResults = new Map();
@@ -141,26 +156,38 @@ export async function start() {
   }
 
   /**
-   * Collects what the extension can see right now. Paste this into a bug report
-   * when a button name changes and the badges stop being correct.
-   * @returns {string}
+   * Collects what the extension can see, over a few seconds, and reports it.
+   * Paste the result into a bug report when a scan behaves oddly.
+   *
+   * It deliberately does not wake the page while it samples. The point is to
+   * show whether the viewer chrome disappears once the pointer stops, because
+   * that is the state every scan works in and the state a user never sees.
+   *
+   * @returns {Promise<string>}
    */
-  function buildDiagnosticsReport() {
-    const pageLocation = readGooglePhotosLocation(location.href);
-    const report = {
+  async function buildDiagnostics() {
+    /** @type {string[][]} */
+    const toolbarSamples = [];
+    for (let sample = 0; sample < DIAGNOSTICS_SAMPLE_COUNT; sample += 1) {
+      toolbarSamples.push(collectToolbarControlNames(buildProbeDeps()));
+      if (sample < DIAGNOSTICS_SAMPLE_COUNT - 1) await wait(DIAGNOSTICS_SAMPLE_GAP_MS);
+    }
+
+    const report = buildDiagnosticsReport({
       extensionVersion: chrome.runtime.getManifest().version,
-      // The photo and album ids are private, so only their presence is reported.
-      url: location.href.replace(/\/(album|share|photo)\/[^/?#]+/g, '/$1/<id>').replace(/[?#].*$/, ''),
-      pageKind: pageLocation.kind,
-      hasAlbumKey: pageLocation.albumKey !== null,
-      hasPhotoKey: pageLocation.photoKey !== null,
+      url: location.href,
+      pageLocation: readGooglePhotosLocation(location.href),
       gridPhotoLinks: findGridPhotoLinks(document).length,
-      toolbarControlNames: collectToolbarControlNames(buildProbeDeps()),
+      toolbarSamples,
       probeResult: probeSavedState(buildProbeDeps()),
-      configuredSaveLabels: settings.saveLabels,
-      configuredSavedLabels: settings.savedLabels,
+      dialogOpen: viewerNavigator.isDialogOpen(),
+      nextControlState: viewerNavigator.readNextControlState(),
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      saveLabels: settings.saveLabels,
+      savedLabels: settings.savedLabels,
       cachedPhotos: Object.keys(albumRecord.photos).length,
-    };
+      lastScan: lastScanOutcome,
+    });
     return JSON.stringify(report, null, 2);
   }
 
@@ -172,7 +199,11 @@ export async function start() {
       panel.setMessage('Stopping after the current photo.');
     },
     onOpenOptions: () => void chrome.runtime.sendMessage({ type: 'open-options' }),
-    onBuildDiagnostics: async () => buildDiagnosticsReport(),
+    onBuildDiagnostics: async () => {
+      const seconds = Math.round((DIAGNOSTICS_SAMPLE_COUNT * DIAGNOSTICS_SAMPLE_GAP_MS) / 1000);
+      panel.setMessage(`Sampling the page for ${seconds} seconds. Do not move the mouse.`);
+      return buildDiagnostics();
+    },
   });
 
   /**
@@ -204,7 +235,8 @@ export async function start() {
       return (
         `Stopped after ${outcome.scanned} photos: no way to reach the next one. ` +
         `Found ${outcome.unsaved} not saved so far.${unknownNote} ` +
-        `If that is the whole album, the scan is complete. If not, raise "Give up on one photo after" and scan again.`
+        `If that is the whole album, the scan is complete. If not, scan again: it resumes from here. ` +
+        `If it stops at the same place twice, press Copy diagnostics.`
       );
     }
     return `Done. ${outcome.unsaved} of ${outcome.scanned} photos are not saved.${unknownNote}`;
@@ -242,6 +274,7 @@ export async function start() {
         readNextControlState: () => viewerNavigator.readNextControlState(),
         requestNextPhoto: (attempt) => viewerNavigator.requestNextPhoto(attempt),
         probe: () => probeSavedState(buildProbeDeps()),
+        keepPageAwake: () => viewerNavigator.keepChromeAwake(),
         wait,
         now: () => Date.now(),
         readCachedState,
@@ -261,6 +294,7 @@ export async function start() {
         rescanKnown: settings.rescanKnown,
       });
 
+      lastScanOutcome = outcome;
       await flushResults(true);
       panel.setMessage(describeOutcome(outcome));
       if (outcome.reason === 'end-of-album') viewerNavigator.closeViewer();

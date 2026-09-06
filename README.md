@@ -66,12 +66,14 @@ Click the extension icon in the Chrome toolbar, or click **Options** in the pane
 The extension decides whether a photo is saved by reading the names of the toolbar buttons. Google Photos writes those names in your own language, and can rename them at any time.
 
 1. Open a photo in the album.
-2. Open the panel and click **Copy diagnostics**.
+2. Open the panel and click **Copy diagnostics**. It then watches the page for five seconds. **Do not move the mouse during those five seconds**, or the report will not show what a scan sees.
 3. Paste the result into a text editor.
-4. Look at `toolbarControlNames`. That is the list of names the extension found.
+4. Look at `toolbar.controlNames`. That is the list of names the extension found.
 5. Copy the name that means "save" into the **Names that mean "not saved yet"** box on the options page, one per line.
 
-The diagnostics report contains no photo ids and no album ids.
+The report also answers the two questions that matter when a scan misbehaves. `toolbar.disappearsWhenIdle` says whether Google Photos hides its buttons once the pointer stops. `lastScan` says where the last scan stopped and why.
+
+The report contains no photo ids, no album ids, and no share key, so it is safe to paste into a public bug report.
 
 ### The scan says "no way to reach the next one"
 
@@ -89,6 +91,12 @@ When Google Photos marks its next button as disabled on the last photo, the scan
 ### The scan is slow
 
 Each photo costs about one fifth of a second when it is not saved, and about half a second when it is. A photo the scan already knows costs almost nothing, so a second scan of the same album is fast. To speed up a first scan, lower **Confirm "saved" for**. Do not lower it below the time your connection needs to draw the toolbar, or the scan starts reporting photos it could not read.
+
+### The scan says some photos "could not be read"
+
+The extension decides by reading the viewer toolbar, so it needs the toolbar on screen. Google Photos hides it while the pointer stays still, and a scan never moves the pointer. The scan wakes the page whenever it sees an empty toolbar, so this should be rare.
+
+If it keeps happening, run **Copy diagnostics** and look at `toolbar.disappearsWhenIdle`. Photos the scan could not read are simply left unmarked, never marked wrongly, so a second scan picks them up.
 
 ### The badges are stale
 

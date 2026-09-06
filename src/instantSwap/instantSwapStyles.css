@@ -1,0 +1,44 @@
+/*
+ * Instant swap between photos.
+ *
+ * Two levels, chosen on the options page and published by the isolated content
+ * script as <html data-gpcs-instant-swap="...">:
+ *   "transitions"                -> only CSS transitions are shortened (default)
+ *   "transitions-and-animations" -> CSS @keyframes animations too
+ *
+ * We shorten to 1ms instead of 0s on purpose. A duration of 0s cancels the
+ * transition, so the browser never fires `transitionend`. Google Photos removes
+ * the outgoing photo when that event arrives, so a 0s rule can leave the old
+ * photo stuck on screen. 1ms is invisible and still fires the event.
+ */
+
+html[data-gpcs-instant-swap='transitions'] *,
+html[data-gpcs-instant-swap='transitions'] *::before,
+html[data-gpcs-instant-swap='transitions'] *::after,
+html[data-gpcs-instant-swap='transitions-and-animations'] *,
+html[data-gpcs-instant-swap='transitions-and-animations'] *::before,
+html[data-gpcs-instant-swap='transitions-and-animations'] *::after {
+  transition-duration: 1ms !important;
+  transition-delay: 0s !important;
+}
+
+html[data-gpcs-instant-swap='transitions-and-animations'] *,
+html[data-gpcs-instant-swap='transitions-and-animations'] *::before,
+html[data-gpcs-instant-swap='transitions-and-animations'] *::after {
+  animation-duration: 1ms !important;
+  animation-delay: 0s !important;
+}
+
+/*
+ * Keep the loading spinners spinning at their normal speed, and never touch our
+ * own panel. These selectors are more specific than the rules above, so they win.
+ */
+html[data-gpcs-instant-swap] [role='progressbar'],
+html[data-gpcs-instant-swap] [role='progressbar'] *,
+html[data-gpcs-instant-swap] .gpcs-root,
+html[data-gpcs-instant-swap] .gpcs-root * {
+  transition-duration: revert !important;
+  transition-delay: revert !important;
+  animation-duration: revert !important;
+  animation-delay: revert !important;
+}

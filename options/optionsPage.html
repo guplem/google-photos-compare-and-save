@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Google Photos Compare &amp; Save</title>
+    <link rel="stylesheet" href="optionsPage.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Google Photos Compare &amp; Save</h1>
+
+      <section>
+        <h2>Instant swap</h2>
+        <p class="hint">Removes the slide between photos so you can flick back and forth and compare them.</p>
+
+        <label class="row">
+          <input type="checkbox" id="instantSwapEnabled" />
+          <span>Swap photos instantly</span>
+        </label>
+
+        <label class="row">
+          <span class="label">What to shorten</span>
+          <select id="instantSwapLevel">
+            <option value="transitions">CSS transitions only (safe default)</option>
+            <option value="transitions-and-animations">Transitions and keyframe animations</option>
+          </select>
+        </label>
+
+        <label class="row">
+          <input type="checkbox" id="patchReducedMotion" />
+          <span>Tell the page you prefer reduced motion</span>
+        </label>
+
+        <label class="row">
+          <input type="checkbox" id="clampWebAnimations" />
+          <span>Also shorten JavaScript animations (turn on if the slide is still there)</span>
+        </label>
+
+        <p class="hint">The last two settings apply from the next page load. Reload Google Photos after changing them.</p>
+      </section>
+
+      <section>
+        <h2>Unsaved badges</h2>
+        <p class="hint">
+          Marks each album thumbnail that is not in your own library yet. Open an album and press
+          <strong>Scan album</strong> in the panel at the bottom left to fill in the marks.
+        </p>
+
+        <label class="row">
+          <input type="checkbox" id="savedBadgesEnabled" />
+          <span>Show a badge on photos you have not saved</span>
+        </label>
+
+        <label class="row">
+          <input type="checkbox" id="dimSavedPhotos" />
+          <span>Fade the photos you already saved</span>
+        </label>
+
+        <label class="row">
+          <input type="checkbox" id="rescanKnown" />
+          <span>Read every photo again on each scan, even the ones already checked</span>
+        </label>
+
+        <p class="hint">Scan speed. Lower numbers scan faster. Raise them if the scan reports photos it could not read.</p>
+
+        <label class="row">
+          <span class="label">Read the toolbar every (ms)</span>
+          <input type="number" id="scanPollMs" min="20" max="1000" step="10" />
+        </label>
+
+        <label class="row">
+          <span class="label">Ignore the first (ms) of each photo</span>
+          <input type="number" id="scanMinDwellMs" min="0" max="3000" step="50" />
+        </label>
+
+        <label class="row">
+          <span class="label">Confirm "saved" for (ms)</span>
+          <input type="number" id="scanConfirmSavedMs" min="50" max="5000" step="50" />
+        </label>
+
+        <label class="row">
+          <span class="label">Give up on one photo after (ms)</span>
+          <input type="number" id="scanTimeoutMs" min="500" max="30000" step="500" />
+        </label>
+      </section>
+
+      <section>
+        <h2>Button names</h2>
+        <p class="hint">
+          The extension decides whether a photo is saved by reading the viewer toolbar. Put one button name per line, in your own
+          language. Use <strong>Copy diagnostics</strong> in the panel to see the names Google Photos actually shows you.
+        </p>
+
+        <label class="row column">
+          <span class="label">Names that mean "not saved yet"</span>
+          <textarea id="saveLabels" rows="5" spellcheck="false"></textarea>
+        </label>
+
+        <label class="row column">
+          <span class="label">Names that mean "already saved"</span>
+          <textarea id="savedLabels" rows="4" spellcheck="false"></textarea>
+        </label>
+      </section>
+
+      <section>
+        <h2>Stored data</h2>
+        <p class="hint">Scan results stay on this computer, in the extension's own storage. Nothing is sent anywhere.</p>
+        <button type="button" id="clearCache" class="secondary">Delete all cached album results</button>
+      </section>
+
+      <div class="footer">
+        <button type="button" id="save" class="primary">Save settings</button>
+        <button type="button" id="reset" class="secondary">Reset to defaults</button>
+        <span id="status" role="status"></span>
+      </div>
+    </main>
+
+    <script type="module" src="optionsPage.js"></script>
+  </body>
+</html>

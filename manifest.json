@@ -1,0 +1,59 @@
+{
+  "manifest_version": 3,
+  "name": "Google Photos Compare & Save",
+  "version": "0.1.0",
+  "description": "Swaps photos instantly instead of sliding, and marks which shared-album photos you have not saved yet.",
+  "minimum_chrome_version": "111",
+  "permissions": ["storage"],
+  "host_permissions": ["https://photos.google.com/*"],
+  "action": {
+    "default_title": "Google Photos Compare & Save options",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "background": {
+    "service_worker": "src/background/serviceWorker.js",
+    "type": "module"
+  },
+  "options_ui": {
+    "page": "options/optionsPage.html",
+    "open_in_tab": true
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://photos.google.com/*"],
+      "world": "MAIN",
+      "run_at": "document_start",
+      "all_frames": false,
+      "js": ["src/instantSwap/mainWorldMotionPatch.js"]
+    },
+    {
+      "matches": ["https://photos.google.com/*"],
+      "world": "ISOLATED",
+      "run_at": "document_start",
+      "all_frames": false,
+      "js": ["src/bootstrap/isolatedWorldBootstrap.js"],
+      "css": [
+        "src/instantSwap/instantSwapStyles.css",
+        "src/savedState/savedBadgeStyles.css",
+        "src/controlPanel/controlPanelStyles.css"
+      ]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["src/*"],
+      "matches": ["https://photos.google.com/*"]
+    }
+  ]
+}

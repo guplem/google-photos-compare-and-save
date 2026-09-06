@@ -1,0 +1,132 @@
+:root {
+  color-scheme: light dark;
+  --page-text: #202124;
+  --page-hint: #5f6368;
+  --page-background: #ffffff;
+  --page-border: #dadce0;
+  --page-accent: #1a73e8;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page-text: #e8eaed;
+    --page-hint: #9aa0a6;
+    --page-background: #202124;
+    --page-border: #3c4043;
+    --page-accent: #8ab4f8;
+  }
+}
+
+body {
+  margin: 0;
+  padding: 32px 24px 64px;
+  font:
+    400 14px/1.6 'Google Sans',
+    Roboto,
+    Arial,
+    sans-serif;
+  color: var(--page-text);
+  background: var(--page-background);
+}
+
+main {
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+h1 {
+  margin: 0 0 24px;
+  font-size: 22px;
+  font-weight: 500;
+}
+
+h2 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+section {
+  padding: 20px 0;
+  border-top: 1px solid var(--page-border);
+}
+
+.hint {
+  margin: 0 0 14px;
+  color: var(--page-hint);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.row.column {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.label {
+  min-width: 220px;
+  color: var(--page-hint);
+}
+
+input[type='number'],
+select,
+textarea {
+  padding: 6px 8px;
+  border: 1px solid var(--page-border);
+  border-radius: 6px;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+}
+
+textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: 'Roboto Mono', Consolas, monospace;
+  font-size: 13px;
+  resize: vertical;
+}
+
+input[type='number'] {
+  width: 110px;
+}
+
+button {
+  padding: 8px 16px;
+  border: 1px solid var(--page-border);
+  border-radius: 999px;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
+button.primary {
+  border-color: transparent;
+  color: #ffffff;
+  background: var(--page-accent);
+}
+
+@media (prefers-color-scheme: dark) {
+  button.primary {
+    color: #202124;
+  }
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-top: 20px;
+  border-top: 1px solid var(--page-border);
+}
+
+#status {
+  color: var(--page-hint);
+}

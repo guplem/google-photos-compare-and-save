@@ -1,0 +1,94 @@
+/*
+ * The panel lives inside the Google Photos page, so every rule is prefixed and
+ * every property is set explicitly. Nothing here is inherited from the site.
+ */
+
+.gpcs-root {
+  position: fixed;
+  bottom: 16px;
+  left: 16px;
+  z-index: 2147483000;
+  width: max-content;
+  max-width: 300px;
+  box-sizing: border-box;
+  padding: 8px;
+  border-radius: 12px;
+  font:
+    400 13px/1.45 'Google Sans',
+    Roboto,
+    Arial,
+    sans-serif;
+  color: #e8eaed;
+  background: rgb(32 33 36 / 96%);
+  box-shadow: 0 4px 18px rgb(0 0 0 / 45%);
+}
+
+.gpcs-toggle {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 8px;
+  font: inherit;
+  font-weight: 500;
+  text-align: left;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
+.gpcs-toggle:hover {
+  background: rgb(255 255 255 / 10%);
+}
+
+.gpcs-root[data-gpcs-collapsed='true'] .gpcs-body {
+  display: none;
+}
+
+.gpcs-body {
+  padding: 4px 8px 2px;
+}
+
+.gpcs-summary,
+.gpcs-message {
+  margin: 0 0 8px;
+  color: #bdc1c6;
+}
+
+.gpcs-message:empty {
+  display: none;
+}
+
+.gpcs-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.gpcs-button {
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px solid rgb(255 255 255 / 20%);
+  border-radius: 999px;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
+.gpcs-button:hover {
+  background: rgb(255 255 255 / 10%);
+}
+
+.gpcs-button--primary {
+  border-color: transparent;
+  font-weight: 500;
+  color: #202124;
+  background: #8ab4f8;
+}
+
+.gpcs-button--primary:hover {
+  background: #aecbfa;
+}

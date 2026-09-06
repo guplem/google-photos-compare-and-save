@@ -1,0 +1,22 @@
+{
+  "name": "google-photos-compare-and-save",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Chrome extension that makes Google Photos swap images instantly and marks unsaved photos in shared albums.",
+  "scripts": {
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit -p jsconfig.json",
+    "test": "node --test",
+    "check": "npm run format:check && npm run typecheck && npm test",
+    "prepare": "lefthook install"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.287",
+    "@types/node": "^26.4.1",
+    "lefthook": "^1.10.10",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.2"
+  }
+}

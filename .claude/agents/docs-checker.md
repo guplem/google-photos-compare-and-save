@@ -46,6 +46,7 @@ You verify and fix drift. You do not author new ADRs or decide new decisions: th
 | `src/savedState/photoViewerNavigator.js`                                      | `adr/0005-semantic-dom-matching.md`, the `README.md` "scan stops early" section                                     |
 | `src/savedState/savedStateStore.js` or a storage key                          | `adr/0007-extension-storage-layout.md`, the `README.md` Privacy section                                             |
 | `package.json` scripts, `jsconfig.json`, `lefthook.yml`, `.github/workflows/` | The `AGENTS.md` Commands table, `.claude/agents/validate.md`, the `README.md` Develop section                       |
+| `src/diagnosticsReport.js`                                                    | The `README.md` troubleshooting steps, which tell the user what to read in the report                               |
 | `manifest.json` permissions or hosts                                          | The `README.md` Privacy section                                                                                     |
 
 ## Output format

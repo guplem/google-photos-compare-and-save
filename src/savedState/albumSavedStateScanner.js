@@ -44,12 +44,14 @@
  * @property {number} saved
  * @property {number} unsaved
  * @property {number} unknown
+ * @property {'enabled' | 'disabled' | 'missing' | null} nextControlState  The next control when the walk ended.
  *
  * @typedef {object} AlbumScannerDeps
  * @property {() => string | null} readCurrentPhotoKey  Photo id currently in the address bar.
  * @property {() => 'enabled' | 'disabled' | 'missing'} readNextControlState  The state of the next-photo control.
  * @property {(attempt: number) => Promise<void>} requestNextPhoto  Ask the page to move on, one method per attempt number.
  * @property {() => SavedState | null} probe  Read the toolbar; null means "cannot tell yet".
+ * @property {() => void} keepPageAwake  Make the page show its viewer chrome again.
  * @property {(milliseconds: number) => Promise<void>} wait
  * @property {() => number} now
  * @property {(photoKey: string) => SavedState | null} readCachedState
@@ -124,6 +126,10 @@ export async function scanAlbumSavedState(deps) {
       }
 
       if (current === null) {
+        // An empty toolbar is what a hidden one looks like, and Google Photos
+        // hides its viewer chrome while the pointer stays still. A scan never
+        // moves the pointer, so wake the page rather than lose the photo.
+        deps.keepPageAwake();
         previous = null;
         savedSince = null;
         continue;
@@ -146,6 +152,8 @@ export async function scanAlbumSavedState(deps) {
    */
   async function advancePastPhoto(currentPhotoKey) {
     for (const [attempt, attemptTimeoutMs] of ADVANCE_ATTEMPT_TIMEOUTS_MS.entries()) {
+      // The next control is part of the chrome that hides with the pointer.
+      deps.keepPageAwake();
       await requestNextPhoto(attempt);
 
       const deadline = now() + attemptTimeoutMs;
@@ -163,7 +171,16 @@ export async function scanAlbumSavedState(deps) {
    * @param {ScanStopReason} reason
    * @returns {ScanOutcome}
    */
-  const outcome = (reason) => ({ reason, scanned: visited.size, saved, unsaved, unknown });
+  const outcome = (reason) => ({
+    reason,
+    scanned: visited.size,
+    saved,
+    unsaved,
+    unknown,
+    // Only meaningful when the walk could not continue, but it is cheap and it
+    // is exactly what a stall report needs.
+    nextControlState: reason === 'stuck' || reason === 'end-of-album' ? deps.readNextControlState() : null,
+  });
 
   let photoKey = readCurrentPhotoKey();
   if (photoKey === null) return outcome('no-photo-open');

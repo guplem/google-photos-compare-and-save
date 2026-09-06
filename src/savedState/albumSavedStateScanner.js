@@ -48,7 +48,7 @@
  * @typedef {object} AlbumScannerDeps
  * @property {() => string | null} readCurrentPhotoKey  Photo id currently in the address bar.
  * @property {() => 'enabled' | 'disabled' | 'missing'} readNextControlState  The state of the next-photo control.
- * @property {(attempt: number) => Promise<void>} requestNextPhoto  Ask the page to move on; attempt 0, then 1, then 2.
+ * @property {(attempt: number) => Promise<void>} requestNextPhoto  Ask the page to move on, one method per attempt number.
  * @property {() => SavedState | null} probe  Read the toolbar; null means "cannot tell yet".
  * @property {(milliseconds: number) => Promise<void>} wait
  * @property {() => number} now
@@ -63,15 +63,26 @@
  * @property {boolean} rescanKnown
  */
 
-/** How many different ways we try to move to the next photo before giving up. */
-const ADVANCE_ATTEMPTS = 3;
-
 /**
  * How long we wait for the address bar to show the next photo, per attempt.
- * The address bar updates as soon as the app accepts the key, well before the
- * photo finishes loading, so this does not need to be generous.
+ *
+ * The list is also the attempt count, and it backs off on purpose. The address
+ * bar usually updates as soon as the app accepts the key, so the first window is
+ * short and the common case stays fast. A window only grows when the album has
+ * not loaded the next page yet, and Google Photos loads a shared album in pages.
+ * The whole budget is about 11 seconds, and a scan pays it only at a real stall.
  */
-const ADVANCE_TIMEOUT_MS = 1200;
+const ADVANCE_ATTEMPT_TIMEOUTS_MS = [1200, 2500, 2500, 5000];
+
+/**
+ * The shortest gap between two advances, in milliseconds.
+ *
+ * A photo that is already in the cache skips the toolbar read, so without this
+ * gap the scan would step through cached photos every few tens of milliseconds,
+ * far faster than a person. It would then arrive at the edge of the cache before
+ * the album had loaded that far, and report a stall it had caused itself.
+ */
+export const MIN_ADVANCE_GAP_MS = 150;
 
 /** How often we look at the address bar while waiting, in milliseconds. */
 const ADVANCE_POLL_MS = 40;
@@ -134,10 +145,10 @@ export async function scanAlbumSavedState(deps) {
    * @returns {Promise<string | null>} The new photo id, or null when nothing worked.
    */
   async function advancePastPhoto(currentPhotoKey) {
-    for (let attempt = 0; attempt < ADVANCE_ATTEMPTS; attempt += 1) {
+    for (const [attempt, attemptTimeoutMs] of ADVANCE_ATTEMPT_TIMEOUTS_MS.entries()) {
       await requestNextPhoto(attempt);
 
-      const deadline = now() + ADVANCE_TIMEOUT_MS;
+      const deadline = now() + attemptTimeoutMs;
       while (now() < deadline) {
         await wait(ADVANCE_POLL_MS);
         const key = readCurrentPhotoKey();
@@ -162,7 +173,8 @@ export async function scanAlbumSavedState(deps) {
     visited.add(photoKey);
 
     const cached = readCachedState(photoKey);
-    const state = !deps.rescanKnown && cached !== null ? cached : await readSettledState();
+    const servedFromCache = !deps.rescanKnown && cached !== null;
+    const state = servedFromCache ? cached : await readSettledState();
 
     if (state === null) {
       unknown += 1;
@@ -175,6 +187,10 @@ export async function scanAlbumSavedState(deps) {
     onProgress({ scanned: visited.size, saved, unsaved, unknown, photoKey });
 
     if (shouldStop()) return outcome('stopped');
+
+    // Reading the toolbar already takes longer than this gap, so only a cached
+    // photo needs the pause. See MIN_ADVANCE_GAP_MS.
+    if (servedFromCache) await wait(MIN_ADVANCE_GAP_MS);
 
     const nextPhotoKey = await advancePastPhoto(photoKey);
     if (nextPhotoKey === null) {

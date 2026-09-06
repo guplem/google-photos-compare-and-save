@@ -55,6 +55,25 @@ function readControlName(element) {
 }
 
 /**
+ * Moves the pointer over the right of the viewer.
+ *
+ * Google Photos renders the next-photo chevron only while the pointer is over
+ * the photo. Without this nudge a click fallback has nothing to click, because
+ * synthetic clicks never move the real pointer.
+ * @param {Window} view
+ */
+function nudgePointerOverViewer(view) {
+  const event = new MouseEvent('mousemove', {
+    bubbles: true,
+    cancelable: true,
+    composed: true,
+    clientX: Math.round(view.innerWidth * 0.9),
+    clientY: Math.round(view.innerHeight * 0.5),
+  });
+  view.document.dispatchEvent(event);
+}
+
+/**
  * @param {Window} view
  * @param {string} type
  * @param {string} key
@@ -189,7 +208,10 @@ export function createPhotoViewerNavigator(view) {
 
     /**
      * Asks the page to show the next photo.
-     * Attempt 0 and 1 send the arrow key. Attempt 2 clicks a named control.
+     *
+     * Even attempts send the arrow key; odd attempts click the named control.
+     * The two methods alternate so that a failure of one never blocks the other,
+     * and the caller grows its waiting window on each attempt.
      * @param {number} attempt
      * @returns {Promise<void>}
      */
@@ -200,11 +222,14 @@ export function createPhotoViewerNavigator(view) {
         await wait(120);
       }
 
-      if (attempt < 2) {
+      if (attempt % 2 === 0) {
         dispatchKey(view, 'keydown', 'ArrowRight');
         dispatchKey(view, 'keyup', 'ArrowRight');
         return;
       }
+
+      nudgePointerOverViewer(view);
+      await wait(120);
       findNextControl(true)?.click();
     },
 

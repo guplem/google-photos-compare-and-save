@@ -1,0 +1,56 @@
+name: Auto-merge PRs
+
+# Fully-vibe-coded flow: no human reviews a PR here. This workflow flags every
+# PR for GitHub's native auto-merge, so it merges itself the moment the required
+# checks pass. Auto-merge only completes once the "Requirements for merge"
+# ruleset on main is satisfied, so the real safety net is the required status
+# check (see pull-request-checks.yml and AGENTS.md), NOT this file.
+#
+# The ruleset carries a pull_request rule with required_approving_review_count 0.
+# It forces changes through a PR and blocks direct pushes, but asks for no
+# approval. A real approval count would make auto-merge wait forever.
+#
+# The token is the plain GITHUB_TOKEN. That is correct here because nothing
+# fires on the merge push: this repo ships as an unpacked extension and has no
+# deploy workflow. A repo whose merge must trigger a push-based deploy needs a
+# GitHub App token instead, because GitHub does not trigger workflows from a
+# push made with GITHUB_TOKEN.
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    branches: [main]
+
+# Only the auto-merge queueing needs write; nothing else here mutates the repo.
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+    # Never auto-merge a fork PR, and never a draft. The repo is public, so an
+    # outside contributor's PR still runs CI but must be merged by a human.
+    if: >-
+      !github.event.pull_request.draft &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - name: Enable auto-merge (merge commit)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          # A later event (synchronize, or the checks passing) can re-run this
+          # after auto-merge is already enabled or the merge has started. gh then
+          # exits non-zero with "already in progress" / "already enabled", which
+          # only means the job already did its work. Treat those as success; fail
+          # only on a genuinely different error.
+          if out="$(gh pr merge --auto --merge "$PR_URL" 2>&1)"; then
+            echo "$out"
+          else
+            echo "$out"
+            case "$out" in
+              *"already in progress"*|*"already enabled"*|*"Auto-merge is already"*) ;;
+              *) exit 1 ;;
+            esac
+          fi

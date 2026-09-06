@@ -1,0 +1,6 @@
+node_modules/
+dist/
+*.zip
+
+# Local review notes written by the review-pr skill.
+.reviews/

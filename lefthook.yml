@@ -1,0 +1,17 @@
+# Git-level hooks. They run for anyone who commits, agent or human, inside a
+# Claude Code session or not.
+#
+# `npm install` installs them, through the `prepare` script in package.json.
+# After a fresh clone, run `npm install` once and the hook is ready.
+#
+# pre-commit runs the same checks as CI, so a local pass and a CI pass cannot
+# drift apart. There is no post-merge hook: this repo has no code generation,
+# so a fresh pull never leaves stale generated files.
+
+pre-commit:
+  parallel: true
+  commands:
+    format:
+      run: npm run format:check
+    typecheck:
+      run: npm run typecheck

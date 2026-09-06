@@ -73,9 +73,16 @@ The extension decides whether a photo is saved by reading the names of the toolb
 
 The diagnostics report contains no photo ids and no album ids.
 
-### The scan stops early and says it could not reach the next photo
+### The scan says "no way to reach the next one"
 
-The scan moves forward with the right arrow key, and then with a button whose name contains a word for "next". It never clicks a button it cannot name, because a blind click once opened the **Edit date/time** dialog. If both ways fail, the scan stops instead of guessing. Send the diagnostics output.
+The scan moves forward with the right arrow key, and then with a button whose name contains a word for "next". It never clicks a button it cannot name, because a blind click once opened the **Edit date/time** dialog. When neither way works, the scan stops instead of guessing.
+
+That message covers two different situations, and the count tells you which one you have.
+
+- **The scan finished the album.** Google Photos keeps the viewer open on the last photo, so "cannot go further" is exactly what the end of an album looks like. If the count matches the album, you are done and the badges are complete.
+- **The scan stalled early.** If the count is well short of the album, a photo took longer to load than the scan waits. Raise **Give up on one photo after** on the options page and scan again. The scan skips every photo it already read, so the second run is fast.
+
+When Google Photos marks its next button as disabled on the last photo, the scan detects that and reports a finished run instead.
 
 ### The scan is slow
 

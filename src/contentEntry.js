@@ -201,7 +201,11 @@ export async function start() {
     if (outcome.reason === 'stopped') return `Stopped after ${outcome.scanned} photos.${unknownNote}`;
     if (outcome.reason === 'no-photo-open') return 'Could not open the viewer.';
     if (outcome.reason === 'stuck') {
-      return `Stopped at photo ${outcome.scanned}: could not reach the next photo. Use Copy diagnostics.`;
+      return (
+        `Stopped after ${outcome.scanned} photos: no way to reach the next one. ` +
+        `Found ${outcome.unsaved} not saved so far.${unknownNote} ` +
+        `If that is the whole album, the scan is complete. If not, raise "Give up on one photo after" and scan again.`
+      );
     }
     return `Done. ${outcome.unsaved} of ${outcome.scanned} photos are not saved.${unknownNote}`;
   }
@@ -235,6 +239,7 @@ export async function start() {
 
       const outcome = await scanAlbumSavedState({
         readCurrentPhotoKey: () => readGooglePhotosLocation(location.href).photoKey,
+        readNextControlState: () => viewerNavigator.readNextControlState(),
         requestNextPhoto: (attempt) => viewerNavigator.requestNextPhoto(attempt),
         probe: () => probeSavedState(buildProbeDeps()),
         wait,

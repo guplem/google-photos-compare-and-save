@@ -13,6 +13,8 @@ import { scanAlbumSavedState } from '../src/savedState/albumSavedStateScanner.js
  * @param {number} [options.lateSaveButtonReadings]    Readings that look "saved" before the Save button draws.
  * @param {number} [options.workingAdvanceAttempt]     Which "next photo" method actually works.
  * @param {boolean} [options.wrapsAround]              Whether the last photo leads back to the first.
+ * @param {'closes' | 'stays'} [options.endBehavior]   What the viewer does past the last photo. Google Photos stays.
+ * @param {'enabled' | 'disabled' | 'missing'} [options.nextControlState] The state of the next-photo control.
  * @param {Record<string, 'saved' | 'unsaved'>} [options.cache]
  */
 function fakeViewer({
@@ -21,6 +23,8 @@ function fakeViewer({
   lateSaveButtonReadings = 0,
   workingAdvanceAttempt = 0,
   wrapsAround = false,
+  endBehavior = 'closes',
+  nextControlState = 'enabled',
   cache = {},
 }) {
   const photoKeys = states.map((_state, index) => `photo-${index}`);
@@ -39,12 +43,15 @@ function fakeViewer({
     },
     deps: {
       readCurrentPhotoKey: () => photoKeys[index] ?? null,
+      readNextControlState: () => nextControlState,
       /** @param {number} attempt */
       async requestNextPhoto(attempt) {
         if (attempt !== workingAdvanceAttempt) return;
         if (index < photoKeys.length - 1) index += 1;
         else if (wrapsAround) index = 0;
-        else index = photoKeys.length; // past the end: readCurrentPhotoKey returns null
+        // Past the last photo, a real Google Photos viewer stays open on it.
+        else if (endBehavior === 'stays') return;
+        else index = photoKeys.length; // readCurrentPhotoKey then returns null
         readingsSinceArrival = 0;
       },
       probe: () => {
@@ -175,6 +182,35 @@ test('reports "stuck" when no way of moving to the next photo works', async () =
 
   assert.equal(outcome.reason, 'stuck');
   assert.equal(outcome.scanned, 1);
+});
+
+test('a disabled next control means the album ended, even though the viewer stayed open', async () => {
+  // The real failure: Google Photos keeps the viewer open on the last photo, so
+  // the photo id never becomes null and a finished scan looked like a stall.
+  const viewer = fakeViewer({ states: ['saved', 'unsaved'], endBehavior: 'stays', nextControlState: 'disabled' });
+
+  const outcome = await scanAlbumSavedState(viewer.deps);
+
+  assert.equal(outcome.reason, 'end-of-album');
+  assert.equal(outcome.scanned, 2);
+});
+
+test('an enabled next control that does nothing is a stall, not the end', async () => {
+  const viewer = fakeViewer({ states: ['saved', 'unsaved'], endBehavior: 'stays', nextControlState: 'enabled' });
+
+  const outcome = await scanAlbumSavedState(viewer.deps);
+
+  assert.equal(outcome.reason, 'stuck');
+});
+
+test('a next control we cannot find is never treated as the end', async () => {
+  // Claiming a complete scan without evidence is the worse error: the user
+  // would trust badges for photos the scan never reached.
+  const viewer = fakeViewer({ states: ['saved', 'unsaved'], endBehavior: 'stays', nextControlState: 'missing' });
+
+  const outcome = await scanAlbumSavedState(viewer.deps);
+
+  assert.equal(outcome.reason, 'stuck');
 });
 
 test('stops on request, after finishing the photo in hand', async () => {

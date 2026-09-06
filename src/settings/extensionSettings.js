@@ -44,7 +44,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
     'afegeix a la biblioteca',
   ],
   savedLabels: ['saved', 'guardado', 'guardada', 'desat', 'desada', 'in your library', 'en tu biblioteca'],
-  scanPollMs: 60,
+  scanPollMs: 40,
   scanMinDwellMs: 150,
   scanConfirmSavedMs: 300,
   scanTimeoutMs: 4000,

@@ -16,14 +16,18 @@
  * The two answers are not symmetrical, and the timing exploits that.
  *
  * A visible "Save" button is positive evidence. A half-drawn toolbar cannot
- * invent one, so we accept `unsaved` on the first clear reading.
+ * invent one, so we accept `unsaved` on the first clear reading and skip the
+ * dwell entirely. That is the fast path, and in a shared album worth managing it
+ * is almost every photo.
  *
  * `saved` is the *absence* of that button, which is exactly what a toolbar that
- * has not finished drawing looks like. So `saved` must hold for `confirmSavedMs`
- * before we believe it.
+ * has not finished drawing looks like. So `saved` waits out `minDwellMs` and
+ * then must hold for `confirmSavedMs` before we believe it.
  *
- * Both answers ignore the first `minDwellMs` after arriving, because the toolbar
- * still shows the previous photo for a moment.
+ * `minDwellMs` covers the moment when the toolbar still belongs to the previous
+ * photo. Only `saved` pays it, because a stale reading can only cost a photo in
+ * that direction. A stale Save button badges a saved photo unsaved, and the user
+ * loses nothing: Google Photos deduplicates a file you re-save.
  */
 
 /**
@@ -87,7 +91,7 @@ const ADVANCE_ATTEMPT_TIMEOUTS_MS = [1200, 2500, 2500, 5000];
 export const MIN_ADVANCE_GAP_MS = 150;
 
 /** How often we look at the address bar while waiting, in milliseconds. */
-const ADVANCE_POLL_MS = 40;
+const ADVANCE_POLL_MS = 25;
 
 /**
  * @param {AlbumScannerDeps} deps
@@ -111,35 +115,42 @@ export async function scanAlbumSavedState(deps) {
     const arrivedAt = now();
     const deadline = arrivedAt + deps.timeoutMs;
 
-    /** @type {SavedState | null} */
-    let previous = null;
-    /** @type {number | null} */
+    /** @type {number | null} When the current run of "no Save button" readings began. */
     let savedSince = null;
 
     while (now() < deadline) {
       await wait(deps.pollMs);
       const current = probe();
 
-      if (now() - arrivedAt < deps.minDwellMs) {
-        previous = current;
-        continue;
-      }
-
       if (current === null) {
         // An empty toolbar is what a hidden one looks like, and Google Photos
         // hides its viewer chrome while the pointer stays still. A scan never
         // moves the pointer, so wake the page rather than lose the photo.
         deps.keepPageAwake();
-        previous = null;
         savedSince = null;
         continue;
       }
 
+      // A visible Save button is proof, so take it on the first reading and do
+      // not wait out the dwell. This is the fast path, and in a shared album it
+      // is almost every photo.
+      //
+      // The dwell exists because the toolbar can still belong to the previous
+      // photo. Skipping it here risks only the harmless direction: a saved photo
+      // badged unsaved, which costs the user one re-save that Google Photos
+      // deduplicates. The costly direction is guarded below.
       if (current === 'unsaved') return 'unsaved';
 
-      if (previous !== 'saved') savedSince = now();
-      if (savedSince !== null && now() - savedSince >= deps.confirmSavedMs) return 'saved';
-      previous = 'saved';
+      // Absence of the button is not proof. Ignore it until the dwell has
+      // passed, because a stale toolbar could be hiding a Save button that
+      // belongs to this photo. Then make it hold, because a toolbar that has
+      // not finished drawing looks exactly the same.
+      if (now() - arrivedAt < deps.minDwellMs) {
+        savedSince = null;
+        continue;
+      }
+      savedSince ??= now();
+      if (now() - savedSince >= deps.confirmSavedMs) return 'saved';
     }
 
     return null;

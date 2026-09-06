@@ -160,6 +160,28 @@ test('accepts an unsaved reading at once, because a Save button cannot appear by
   assert.equal(viewer.probeCalls, 1);
 });
 
+test('does not make a visible Save button wait out the settling delay', async () => {
+  // The speed win: in a shared album almost every photo is unsaved, so this is
+  // the path that decides how long a whole scan takes.
+  const viewer = fakeViewer({ states: ['unsaved'] });
+  viewer.deps.minDwellMs = 500;
+
+  const outcome = await scanAlbumSavedState(viewer.deps);
+
+  assert.equal(outcome.unsaved, 1);
+  assert.ok(viewer.elapsed < 500, `reading it took ${viewer.elapsed}ms, so the delay was still paid`);
+});
+
+test('still makes an absent Save button wait, because absence can mean "not drawn yet"', async () => {
+  const viewer = fakeViewer({ states: ['saved'] });
+  viewer.deps.minDwellMs = 200;
+
+  const outcome = await scanAlbumSavedState(viewer.deps);
+
+  assert.equal(outcome.saved, 1);
+  assert.ok(viewer.elapsed >= 200, `it believed "saved" after only ${viewer.elapsed}ms`);
+});
+
 test('reports a photo as unknown when the toolbar never appears', async () => {
   const viewer = fakeViewer({ states: ['unsaved'], blankReadings: Number.MAX_SAFE_INTEGER });
 

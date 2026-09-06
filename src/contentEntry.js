@@ -18,6 +18,7 @@ import { isAlbumContext, readGooglePhotosLocation, findGridPhotoLinks } from './
 import { createSavedStateStore, summarizeAlbumRecord, createEmptyAlbumRecord } from './savedState/savedStateStore.js';
 import { collectToolbarControlNames, createDomProbeHelpers, probeSavedState } from './savedState/savedStateProbe.js';
 import { createPhotoViewerNavigator } from './savedState/photoViewerNavigator.js';
+import { createAlbumGridReader } from './savedState/albumGridReader.js';
 import { scanAlbumSavedState } from './savedState/albumSavedStateScanner.js';
 import { createSavedBadgeRenderer } from './savedState/savedBadgeRenderer.js';
 import { createControlPanel } from './controlPanel/controlPanelController.js';
@@ -31,6 +32,13 @@ const WRITE_BATCH_SIZE = 10;
 
 /** How long the virtualised album grid needs to redraw after a scroll, in milliseconds. */
 const GRID_REDRAW_WAIT_MS = 500;
+
+/**
+ * How many screens of the grid to read before giving up on finding new work.
+ * Each step covers about thirty thumbnails, so this reaches a very large album,
+ * and the search stops early as soon as it finds one unchecked photo.
+ */
+const GRID_SCROLL_MAX_STEPS = 80;
 
 /**
  * How the diagnostics button samples the toolbar.
@@ -68,6 +76,7 @@ function waitForBody() {
 export async function start() {
   const store = createSavedStateStore(chrome.storage.local);
   const viewerNavigator = createPhotoViewerNavigator(window);
+  const gridReader = createAlbumGridReader(window);
 
   /** @type {import('./settings/extensionSettings.js').ExtensionSettings} */
   let settings = DEFAULT_SETTINGS;
@@ -257,11 +266,38 @@ export async function start() {
     panel.setScanState('scanning');
     panel.setMessage('Starting.');
 
+    // A scan started with a photo already open begins there, so the user can
+    // pick the starting point by hand.
+    let rescanEverything = settings.rescanKnown;
+
     try {
       if (readGooglePhotosLocation(location.href).photoKey === null) {
-        panel.setMessage('Going back to the first photo.');
-        if (!(await viewerNavigator.openFirstPhoto(GRID_REDRAW_WAIT_MS))) {
+        panel.setMessage('Looking for the first photo that is not checked yet.');
+
+        const plan = await gridReader.planScanStart({
+          isKnown: (photoKey) => readCachedState(photoKey) !== null,
+          stepWaitMs: GRID_REDRAW_WAIT_MS,
+          maxSteps: GRID_SCROLL_MAX_STEPS,
+          onProgress: (count) => panel.setMessage(`Looking for the first unchecked photo. Read ${count} thumbnails.`),
+        });
+
+        if (plan.mode === 'no-photos') {
           panel.setMessage('No photos found on this page.');
+          return;
+        }
+
+        if (plan.mode === 'rescan-all') {
+          rescanEverything = true;
+          panel.setMessage('Every photo is already checked. Reading the whole album again.');
+        } else {
+          panel.setMessage('Starting at the first photo that is not checked yet.');
+        }
+
+        // The chosen thumbnail is on screen, because the search stopped on it.
+        // Falling back to the first photo covers the case where the grid redrew.
+        const opened = gridReader.openPhotoByKey(plan.photoKey) || (await viewerNavigator.openFirstPhoto(GRID_REDRAW_WAIT_MS));
+        if (!opened) {
+          panel.setMessage('Could not open a photo to start from.');
           return;
         }
         await wait(GRID_REDRAW_WAIT_MS);
@@ -294,7 +330,7 @@ export async function start() {
         minDwellMs: settings.scanMinDwellMs,
         confirmSavedMs: settings.scanConfirmSavedMs,
         timeoutMs: settings.scanTimeoutMs,
-        rescanKnown: settings.rescanKnown,
+        rescanKnown: rescanEverything,
       });
 
       lastScanOutcome = outcome;

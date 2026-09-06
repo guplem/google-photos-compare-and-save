@@ -47,6 +47,7 @@
  *
  * @typedef {object} AlbumScannerDeps
  * @property {() => string | null} readCurrentPhotoKey  Photo id currently in the address bar.
+ * @property {() => 'enabled' | 'disabled' | 'missing'} readNextControlState  The state of the next-photo control.
  * @property {(attempt: number) => Promise<void>} requestNextPhoto  Ask the page to move on; attempt 0, then 1, then 2.
  * @property {() => SavedState | null} probe  Read the toolbar; null means "cannot tell yet".
  * @property {(milliseconds: number) => Promise<void>} wait
@@ -177,8 +178,16 @@ export async function scanAlbumSavedState(deps) {
 
     const nextPhotoKey = await advancePastPhoto(photoKey);
     if (nextPhotoKey === null) {
-      // The viewer closed, or the album ended, or every way of moving on failed.
-      return outcome(readCurrentPhotoKey() === null ? 'end-of-album' : 'stuck');
+      // The viewer closed, so there is nothing left to read.
+      if (readCurrentPhotoKey() === null) return outcome('end-of-album');
+
+      // The viewer is still open on the same photo. Google Photos does exactly
+      // that on the last photo of an album, so "cannot advance" is not proof of
+      // a stall. Only a next control that is present and disabled proves the
+      // album ended. Anything else stays `stuck`, because a scan that claims to
+      // be complete without that proof leaves the user trusting badges for
+      // photos it never read.
+      return outcome(deps.readNextControlState() === 'disabled' ? 'end-of-album' : 'stuck');
     }
     photoKey = nextPhotoKey;
   }

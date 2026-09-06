@@ -102,14 +102,15 @@ export function createPhotoViewerNavigator(view) {
   }
 
   /**
-   * A control we are willing to click: it is named like a "next" control, and it
-   * sits on the right side of the window. Both must hold.
+   * A control named like a "next" control.
+   * @param {boolean} requireRightEdge Also demand that it sits on the right of the window.
    * @returns {HTMLElement | null}
    */
-  function findNextControl() {
+  function findNextControl(requireRightEdge) {
     for (const control of findVisibleControls()) {
       const name = readControlName(control);
       if (name === '' || !NEXT_CONTROL_WORDS.some((word) => name.includes(word))) continue;
+      if (!requireRightEdge) return control;
       const box = control.getBoundingClientRect();
       if (box.left + box.width / 2 < view.innerWidth * RIGHT_EDGE_FRACTION) continue;
       return control;
@@ -118,6 +119,30 @@ export function createPhotoViewerNavigator(view) {
   }
 
   return {
+    /**
+     * Reports whether the viewer still offers a next photo.
+     *
+     * The scan uses this to tell a finished album from a stall. Both look the
+     * same otherwise: Google Photos keeps the viewer open on the last photo, so
+     * the address bar never changes and never clears.
+     *
+     * Only `disabled` is positive evidence of the end. `missing` stays
+     * ambiguous on purpose, because a control can also be absent while the page
+     * is still drawing.
+     *
+     * @returns {'enabled' | 'disabled' | 'missing'}
+     */
+    readNextControlState() {
+      // The right-edge rule guards a click, not a read, so it does not apply here.
+      const control = findNextControl(false);
+      if (control === null) return 'missing';
+      const disabled =
+        control.getAttribute('aria-disabled') === 'true' ||
+        control.hasAttribute('disabled') ||
+        control.getAttribute('aria-hidden') === 'true';
+      return disabled ? 'disabled' : 'enabled';
+    },
+
     /** @returns {boolean} True while a modal dialog covers the viewer. */
     isDialogOpen() {
       return Array.from(view.document.querySelectorAll(DIALOG_SELECTOR)).some((dialog) => isVisible(view, dialog));
@@ -180,7 +205,7 @@ export function createPhotoViewerNavigator(view) {
         dispatchKey(view, 'keyup', 'ArrowRight');
         return;
       }
-      findNextControl()?.click();
+      findNextControl(true)?.click();
     },
 
     /** Leaves the viewer and goes back to the grid. */

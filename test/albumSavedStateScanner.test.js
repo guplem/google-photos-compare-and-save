@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { MIN_ADVANCE_GAP_MS, scanAlbumSavedState } from '../src/savedState/albumSavedStateScanner.js';
+import { MIN_PHOTO_INTERVAL_MS, scanAlbumSavedState } from '../src/savedState/albumSavedStateScanner.js';
 
 /**
  * A fake Google Photos viewer with a virtual clock, so the tests finish at once
@@ -272,7 +272,7 @@ test('paces itself through cached photos so it cannot outrun the page', async ()
   await scanAlbumSavedState(viewer.deps);
 
   assert.equal(viewer.probeCalls, 0, 'cached photos must still skip the toolbar read');
-  assert.ok(viewer.elapsed >= 2 * MIN_ADVANCE_GAP_MS, `a cached run must still pace each advance, spent ${viewer.elapsed}ms`);
+  assert.ok(viewer.elapsed >= 2 * MIN_PHOTO_INTERVAL_MS, `a cached run must still pace each photo, spent ${viewer.elapsed}ms`);
 });
 
 test('wakes the page when the toolbar reads as empty, instead of losing the photo', async () => {

@@ -52,7 +52,7 @@ test('carries the outcome of the last scan, so a stall can be read after the fac
     saveLabels: ['save'],
     savedLabels: ['saved'],
     cachedPhotos: 188,
-    lastScan: { reason: 'stuck', scanned: 52, saved: 1, unsaved: 39, unknown: 12, nextControlState: 'missing' },
+    lastScan: { reason: 'stuck', scanned: 52, saved: 1, unsaved: 39, unknown: 12, fromCache: 0, nextControlState: 'missing' },
   });
 
   // `lastScan` is either an outcome or a sentence for a human reading the JSON.

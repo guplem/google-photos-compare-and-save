@@ -38,7 +38,11 @@ The scan scrolls the grid back to the top, opens the first photo, then steps thr
 
 When the scan ends, the grid shows an amber badge on every photo that is not in your library.
 
-The scan takes a few minutes for a large album, because it must open each photo. You only pay that cost once per album: results are cached. A later scan skips the photos it already knows, unless you turn on **Read every photo again on each scan**.
+The scan takes a few minutes for a large album, because it must open each photo.
+
+You only pay the reading cost once per album. A later scan still walks past every photo, but it does not read the ones it already knows, so it passes them quickly. The panel says how many it already knew. To skip the walk as well, open the photo you want to start from, then press **Scan album**: a scan always starts at the photo on screen, and only goes back to the first photo when no photo is open.
+
+To read every photo again, turn on **Read every photo again on each scan**.
 
 You do not have to scan at all. The extension also records the state of every photo you open by hand, so normal browsing fills the badges in over time.
 

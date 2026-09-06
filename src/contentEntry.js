@@ -281,8 +281,11 @@ export async function start() {
         onResult: recordResult,
         onProgress: (progress) => {
           const perPhoto = Math.round((Date.now() - startedAt) / progress.scanned);
+          // Naming the cached photos separately matters: without it a resumed
+          // scan looks like it is reading everything again.
+          const knownNote = progress.fromCache > 0 ? ` (${progress.fromCache} already known)` : '';
           panel.setMessage(
-            `Checked ${progress.scanned}: ${progress.unsaved} not saved, ${progress.saved} saved. ${perPhoto}ms each.`,
+            `Passed ${progress.scanned}${knownNote}: ${progress.unsaved} not saved, ${progress.saved} saved. ${perPhoto}ms each.`,
           );
           void flushResults(false);
         },

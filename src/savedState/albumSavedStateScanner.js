@@ -38,6 +38,7 @@
  * @property {number} saved
  * @property {number} unsaved
  * @property {number} unknown   Photos whose toolbar never settled.
+ * @property {number} fromCache Photos answered from the cache, with no toolbar read.
  * @property {string} photoKey  The photo just visited.
  *
  * @typedef {'end-of-album' | 'stopped' | 'loop-detected' | 'no-photo-open' | 'stuck'} ScanStopReason
@@ -48,6 +49,7 @@
  * @property {number} saved
  * @property {number} unsaved
  * @property {number} unknown
+ * @property {number} fromCache
  * @property {'enabled' | 'disabled' | 'missing' | null} nextControlState  The next control when the walk ended.
  *
  * @typedef {object} AlbumScannerDeps
@@ -81,14 +83,18 @@
 const ADVANCE_ATTEMPT_TIMEOUTS_MS = [1200, 2500, 2500, 5000];
 
 /**
- * The shortest gap between two advances, in milliseconds.
+ * The shortest time one photo may take, in milliseconds.
  *
- * A photo that is already in the cache skips the toolbar read, so without this
- * gap the scan would step through cached photos every few tens of milliseconds,
- * far faster than a person. It would then arrive at the edge of the cache before
- * the album had loaded that far, and report a stall it had caused itself.
+ * Google Photos loads a shared album in pages. Without a floor the scan steps
+ * through photos every few tens of milliseconds, far faster than a person, and
+ * arrives past the loaded edge, then reports a stall it caused itself.
+ *
+ * The floor covers every photo, whatever the answer came from. An earlier
+ * version charged it only to cached photos, which made a resumed scan slower
+ * than a first one once reading a photo became fast. What matters is how fast
+ * the loop turns, not where the answer came from.
  */
-export const MIN_ADVANCE_GAP_MS = 150;
+export const MIN_PHOTO_INTERVAL_MS = 100;
 
 /** How often we look at the address bar while waiting, in milliseconds. */
 const ADVANCE_POLL_MS = 25;
@@ -105,6 +111,7 @@ export async function scanAlbumSavedState(deps) {
   let saved = 0;
   let unsaved = 0;
   let unknown = 0;
+  let fromCache = 0;
 
   /**
    * Reads the toolbar until the answer is trustworthy. See the note at the top
@@ -188,6 +195,7 @@ export async function scanAlbumSavedState(deps) {
     saved,
     unsaved,
     unknown,
+    fromCache,
     // Only meaningful when the walk could not continue, but it is cheap and it
     // is exactly what a stall report needs.
     nextControlState: reason === 'stuck' || reason === 'end-of-album' ? deps.readNextControlState() : null,
@@ -200,8 +208,10 @@ export async function scanAlbumSavedState(deps) {
     if (visited.has(photoKey)) return outcome('loop-detected');
     visited.add(photoKey);
 
+    const photoStartedAt = now();
     const cached = readCachedState(photoKey);
     const servedFromCache = !deps.rescanKnown && cached !== null;
+    if (servedFromCache) fromCache += 1;
     const state = servedFromCache ? cached : await readSettledState();
 
     if (state === null) {
@@ -212,13 +222,14 @@ export async function scanAlbumSavedState(deps) {
       onResult(photoKey, state);
     }
 
-    onProgress({ scanned: visited.size, saved, unsaved, unknown, photoKey });
+    onProgress({ scanned: visited.size, saved, unsaved, unknown, fromCache, photoKey });
 
     if (shouldStop()) return outcome('stopped');
 
-    // Reading the toolbar already takes longer than this gap, so only a cached
-    // photo needs the pause. See MIN_ADVANCE_GAP_MS.
-    if (servedFromCache) await wait(MIN_ADVANCE_GAP_MS);
+    // Hold the floor, counting whatever this photo already spent. A photo that
+    // took longer than the floor pays nothing extra. See MIN_PHOTO_INTERVAL_MS.
+    const spentOnPhoto = now() - photoStartedAt;
+    if (spentOnPhoto < MIN_PHOTO_INTERVAL_MS) await wait(MIN_PHOTO_INTERVAL_MS - spentOnPhoto);
 
     const nextPhotoKey = await advancePastPhoto(photoKey);
     if (nextPhotoKey === null) {

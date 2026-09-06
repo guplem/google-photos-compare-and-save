@@ -1,0 +1,59 @@
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Grep",
+      "Glob",
+      "Bash(ls *)",
+      "Bash(cat *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(wc *)",
+      "Bash(find *)",
+      "Bash(git status*)",
+      "Bash(git log*)",
+      "Bash(git diff*)",
+      "Bash(git show*)",
+      "Bash(git branch*)",
+      "Bash(gh issue *)",
+      "Bash(gh pr *)",
+      "Bash(gh label *)",
+      "Bash(npm install*)",
+      "Bash(npm ci*)",
+      "Bash(npm test*)",
+      "Bash(npm run check*)",
+      "Bash(npm run format*)",
+      "Bash(npm run typecheck*)",
+      "Bash(node --test*)",
+      "Bash(npx prettier *)",
+      "Bash(npx tsc *)"
+    ],
+    "ask": ["Bash(powershell *makeIcons.ps1*)"],
+    "deny": []
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "case \"$CLAUDE_FILE\" in *CLAUDE.md) echo '[hook] WARNING: every CLAUDE.md is a one-line @AGENTS.md shim. Put the content in the matching AGENTS.md instead (see adr/0001-agent-docs-structure.md).' ;; esac"
+          },
+          {
+            "type": "command",
+            "command": "case \"$CLAUDE_FILE\" in *extensionSettings.js) echo '[hook] Settings changed. A setting must exist in all four places: DEFAULT_SETTINGS, normalizeSettings, options/optionsPage.html, and both functions in options/optionsPage.js. Use the add-setting skill.' ;; esac"
+          },
+          {
+            "type": "command",
+            "command": "case \"$CLAUDE_FILE\" in *.js|*.json|*.md|*.css|*.html) npx prettier --write \"$CLAUDE_FILE\" >/dev/null 2>&1 || true ;; esac"
+          },
+          {
+            "type": "command",
+            "command": "case \"$CLAUDE_FILE\" in *src/savedState/*|*src/contentEntry.js|*src/googlePhotosPage.js) echo '[hook] Scan or page logic changed. Run the validate agent before you open a PR.' ;; esac"
+          }
+        ]
+      }
+    ]
+  }
+}

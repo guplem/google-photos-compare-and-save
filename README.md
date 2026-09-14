@@ -1,5 +1,14 @@
 # Google Photos Compare & Save
 
+> **This repository is archived. Its two features now live in one repository each.**
+>
+> - **Instant swap**, which removes the slide between photos: [google-photos-instant-swap](https://github.com/guplem/google-photos-instant-swap)
+> - **Unsaved badges**, which mark the shared-album photos that are not in your library yet: [google-photos-auto-save-check](https://github.com/guplem/google-photos-auto-save-check)
+>
+> Install both to get what this extension did. They were split because the two halves shared almost no code, so a change to one always risked the other.
+>
+> Nothing here is maintained any more. The text below describes the extension as it was.
+
 A Chrome extension for the Google Photos website. It does two things.
 
 **1. It swaps photos instantly.** Google Photos slides one photo out while the next slides in. When you press the arrow keys fast, the two photos overlap and you cannot compare them. This extension removes the slide, so each press shows one clean photo.
